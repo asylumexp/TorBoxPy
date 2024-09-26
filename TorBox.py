@@ -1,5 +1,6 @@
 import requests
-from Apis import TorrentsApi, Store, AuthenticationType
+from Apis import TorrentsApi, Store
+from Models import AuthenticationType
 
 
 class TorBoxPyClient:

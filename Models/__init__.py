@@ -1,3 +1,4 @@
+from Models.AuthenticationType import AuthenticationType
 from Models.AvailableTorrent import AvailableTorrent
 from Models.AvailableUsenet import AvailableUsenet
 from Models.QueuedTorrent import QueuedTorrent

@@ -4,6 +4,7 @@ import asyncio
 from Exceptions import AccessTokenExpired, TorBoxException
 from Apis import Store
 from typing import Optional, Tuple, TypeVar, Generic, Dict, Any, List
+import aiohttp
 
 T = TypeVar('T')
 
@@ -18,8 +19,7 @@ class TorBoxRequests:
                       header_output: Optional[str],
                       require_authentication: bool,
                       request_type: 'RequestType',
-                      data: Optional[Dict[str, Any]],
-                      cancellation_token: Any) -> Tuple[Optional[str], Optional[str]]:
+                      data: Optional[Dict[str, Any]]) -> Tuple[Optional[str], Optional[str]]:
         self._http_client.headers.pop("Authorization", None)
 
         if require_authentication:
@@ -29,17 +29,10 @@ class TorBoxRequests:
         while True:
             try:
                 if request_type == RequestType.Get:
-                    response = self._http_client.get(
-                        f"{base_url}{url}", timeout=cancellation_token)
+                    response = self._http_client.get(f"{base_url}{url}")
                 elif request_type == RequestType.Post:
                     response = self._http_client.post(
-                        f"{base_url}{url}", data=data, timeout=cancellation_token)
-                elif request_type == RequestType.Put:
-                    response = self._http_client.put(
-                        f"{base_url}{url}", data=data, timeout=cancellation_token)
-                elif request_type == RequestType.Delete:
-                    response = self._http_client.delete(
-                        f"{base_url}{url}", timeout=cancellation_token)
+                        f"{base_url}{url}", data=data)
                 else:
                     raise ValueError("Invalid request type")
 
@@ -80,9 +73,8 @@ class TorBoxRequests:
                               url: str,
                               require_authentication: bool,
                               request_type: 'RequestType',
-                              data: Optional[Dict[str, Any]],
-                              cancellation_token: Any) -> T:
-        result, _ = await self.request(base_url, url, None, require_authentication, request_type, data, cancellation_token)
+                              data: Optional[Dict[str, Any]]) -> T:
+        result, _ = await self.request(base_url, url, None, require_authentication, request_type, data)
 
         if result is None:
             return T()
@@ -96,55 +88,54 @@ class TorBoxRequests:
             raise Exception(
                 f"Unable to deserialize response. Response was: {result}", ex)
 
-    async def get_auth_request_async(self, url: str, cancellation_token: Any) -> T:
-        return await self.request_generic(self._store.auth_url, url, False, RequestType.Get, None, cancellation_token)
+    async def get_auth_request_async(self, url: str) -> T:
+        return await self.request_generic(self._store.auth_url, url, False, RequestType.Get, None)
 
-    async def post_auth_request_async(self, url: str, data: List[Tuple[str, Optional[str]]], cancellation_token: Any) -> T:
+    async def post_auth_request_async(self, url: str, data: List[Tuple[str, Optional[str]]]) -> T:
         content = {k: v for k, v in data}
-        return await self.request_generic(self._store.auth_url, url, False, RequestType.Post, content, cancellation_token)
+        return await self.request_generic(self._store.auth_url, url, False, RequestType.Post, content)
 
-    async def get_request_header_async(self, url: str, header: str, require_authentication: bool, cancellation_token: Any) -> Optional[str]:
-        _, header_value = await self.request(self._store.api_url, url, header, require_authentication, RequestType.Get, None, cancellation_token)
+    async def get_request_header_async(self, url: str, header: str, require_authentication: bool) -> Optional[str]:
+        _, header_value = await self.request(self._store.api_url, url, header, require_authentication, RequestType.Get, None)
         return header_value
 
-    async def get_request_async(self, url: str, require_authentication: bool, cancellation_token: Any) -> Optional[str]:
-        text, _ = await self.request(self._store.api_url, url, None, require_authentication, RequestType.Get, None, cancellation_token)
+    async def get_request_async(self, url: str, require_authentication: bool) -> Optional[str]:
+        text, _ = await self.request(self._store.api_url, url, None, require_authentication, RequestType.Get, None)
         return text
 
-    async def get_request_async_generic(self, url: str, require_authentication: bool, cancellation_token: Any) -> T:
-        return await self.request_generic(self._store.api_url, url, require_authentication, RequestType.Get, None, cancellation_token)
+    async def get_request_async_generic(self, url: str, require_authentication: bool) -> T:
+        return await self.request_generic(self._store.api_url, url, require_authentication, RequestType.Get, None)
 
-    async def get_link_request_async(self, url: str, require_authentication: bool, cancellation_token: Any) -> T:
+    async def get_link_request_async(self, url: str, require_authentication: bool) -> T:
         url += f"&token={self._store.bearer_token}"
-        return await self.request_generic(self._store.api_url, url, require_authentication, RequestType.Get, None, cancellation_token)
+        return await self.request_generic(self._store.api_url, url, require_authentication, RequestType.Get, None)
 
-    async def post_request_async(self, url: str, data: Optional[List[Tuple[str, Optional[str]]]], require_authentication: bool, cancellation_token: Any):
-        content = {k: v for k, v in data} if data else None
-        await self.request(self._store.api_url, url, None, require_authentication, RequestType.Post, content, cancellation_token)
+    async def post_request_async(self, url: str, data: Optional[List[Tuple[str, Optional[str]]]], require_authentication: bool):
+        await self.request(self._store.api_url, url, None, require_authentication, RequestType.Post, data)
 
-    async def post_request_raw_async(self, url: str, data: Optional[Dict[str, Any]], require_authentication: bool, cancellation_token: Any):
-        await self.request(self._store.api_url, url, None, require_authentication, RequestType.Post, data, cancellation_token)
+    async def post_request_raw_async(self, url: str, data: Optional[Dict[str, Any]], require_authentication: bool):
+        await self.request(self._store.api_url, url, None, require_authentication, RequestType.Post, data)
 
-    async def post_request_raw_async_generic(self, url: str, data: Optional[Dict[str, Any]], require_authentication: bool, cancellation_token: Any) -> T:
-        return await self.request_generic(self._store.api_url, url, require_authentication, RequestType.Post, data, cancellation_token)
+    async def post_request_raw_async_generic(self, url: str, data: Optional[Dict[str, Any]], require_authentication: bool) -> T:
+        return await self.request_generic(self._store.api_url, url, require_authentication, RequestType.Post, data)
 
-    async def post_request_async_generic(self, url: str, data: Optional[List[Tuple[str, Optional[str]]]], require_authentication: bool, cancellation_token: Any) -> T:
-        content = {k: v for k, v in data} if data else None
-        return await self.request_generic(self._store.api_url, url, require_authentication, RequestType.Post, content, cancellation_token)
+    async def post_request_async_generic(self, url: str, data: Optional[List[Tuple[str, Optional[str]]]], require_authentication: bool) -> T:
+        # content = {k: v for k, v in data} if data else None
+        return await self.request_generic(self._store.api_url, url, require_authentication, RequestType.Post, data)
 
-    async def post_request_multipart_async(self, url: str, data: Optional[Dict[str, Any]], require_authentication: bool, cancellation_token: Any) -> T:
-        return await self.request_generic(self._store.api_url, url, require_authentication, RequestType.Post, data, cancellation_token)
+    async def post_request_multipart_async(self, url: str, data: Optional[Dict[str, Any]], require_authentication: bool) -> T:
+        return await self.request_generic(self._store.api_url, url, require_authentication, RequestType.Post, data)
 
-    async def put_request_async(self, url: str, file: bytes, require_authentication: bool, cancellation_token: Any):
+    async def put_request_async(self, url: str, file: bytes, require_authentication: bool):
         content = file
-        await self.request(self._store.api_url, url, None, require_authentication, RequestType.Put, content, cancellation_token)
+        await self.request(self._store.api_url, url, None, require_authentication, RequestType.Put, content)
 
-    async def put_request_async_generic(self, url: str, file: bytes, require_authentication: bool, cancellation_token: Any) -> T:
+    async def put_request_async_generic(self, url: str, file: bytes, require_authentication: bool) -> T:
         content = file
-        return await self.request_generic(self._store.api_url, url, require_authentication, RequestType.Put, content, cancellation_token)
+        return await self.request_generic(self._store.api_url, url, require_authentication, RequestType.Put, content)
 
-    async def delete_request_async(self, url: str, require_authentication: bool, cancellation_token: Any):
-        await self.request(self._store.api_url, url, None, require_authentication, RequestType.Delete, None, cancellation_token)
+    async def delete_request_async(self, url: str, require_authentication: bool):
+        await self.request(self._store.api_url, url, None, require_authentication, RequestType.Delete, None)
 
     @staticmethod
     def parse_tor_box_exception(text: Optional[str]) -> Optional['TorBoxException']:
